@@ -1,0 +1,2 @@
+# VibeCoding
+Simple vibe code
