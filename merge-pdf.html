@@ -116,5 +116,32 @@
   }
 </script>
 
+  <div id="notify" style="display:none; margin-top:15px; padding:12px; background:#4caf50; color:white; border-radius:6px;">PDF downloaded successfully!</div>
+
+<script>
+// Notification function (with vibration + slide animation)
+function showNotify() {
+  const n = document.getElementById('notify');
+  n.style.display = 'block';
+  n.style.opacity = '0';
+  n.style.transform = 'translateY(20px)';
+
+  setTimeout(() => {
+    n.style.transition = 'all 0.3s ease';
+    n.style.opacity = '1';
+    n.style.transform = 'translateY(0)';
+  }, 10);
+
+  // Vibration
+  if (navigator.vibrate) navigator.vibrate(120);
+
+  setTimeout(() => {
+    n.style.opacity = '0';
+    n.style.transform = 'translateY(20px)';
+    setTimeout(() => (n.style.display = 'none'), 300);
+  }, 2500);
+}
+</script>
+
 </body>
 </html>
