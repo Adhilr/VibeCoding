@@ -11,17 +11,27 @@
     img { width: 60px; height: 60px; object-fit: cover; border-radius: 5px; margin-right: 10px; }
     button { margin-left: auto; }
     .item.dragging { opacity: 0.4; }
+
+    #notify {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4caf50;
+      color: white;
+      padding: 14px 20px;
+      border-radius: 8px;
+      display: none;
+      opacity: 0;
+      font-size: 16px;
+    }
   </style>
 </head>
-<!-- ADD THIS -->
+
+<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<script>
-  const { jsPDF } = window.jspdf;  // REQUIRED
-
-</script>
 <body>
-    
   <h2>Images → PDF</h2>
 
   <input type="file" id="fileInput" accept="image/*" multiple />
@@ -29,117 +39,136 @@
 
   <div class="image-list" id="imageList"></div>
 
-  <script>
-    let images = [];
-
-    const fileInput = document.getElementById('fileInput');
-    const addBtn = document.getElementById('addBtn');
-    const imageList = document.getElementById('imageList');
-
-    addBtn.onclick = () => {
-      const files = [...fileInput.files];
-      if (!files.length) return;
-
-      files.forEach(file => {
-        const url = URL.createObjectURL(file);
-        images.push({ file, url });
-      });
-
-      fileInput.value = ""; // reset input
-      renderList();
-    };
-
-    function renderList() {
-      imageList.innerHTML = '';
-
-      images.forEach((img, index) => {
-        const div = document.createElement('div');
-        div.className = 'item';
-        div.draggable = true;
-
-        div.innerHTML = `
-          <img src="${img.url}" />
-          <span>${img.file.name}</span>
-          <button data-remove="${index}">Remove</button>
-        `;
-
-        div.addEventListener('dragstart', e => {
-          div.classList.add('dragging');
-          e.dataTransfer.setData('index', index);
-        });
-
-        div.addEventListener('dragend', () => {
-          div.classList.remove('dragging');
-        });
-
-        div.addEventListener('dragover', e => {
-          e.preventDefault();
-        });
-
-        div.addEventListener('drop', e => {
-          const from = Number(e.dataTransfer.getData('index'));
-          const to = index;
-          moveItem(from, to);
-        });
-
-        div.querySelector('button').onclick = () => {
-          const idx = Number(div.querySelector('button').dataset.remove);
-          images.splice(idx, 1);
-          renderList();
-        };
-
-        imageList.appendChild(div);
-      });
-    }
-
-    function moveItem(from, to) {
-      const temp = images[from];
-      images.splice(from, 1);
-      images.splice(to, 0, temp);
-      renderList();
-    }
-  </script>
   <button id="pdfBtn" style="margin-top:20px; padding:10px 20px; font-size:16px;">Create PDF</button>
 
-  <script>
-    // existing JS stays above
+  <div id="notify">PDF Downloaded!</div>
 
-    document.getElementById('pdfBtn').onclick = async () => {
-      if (!images.length) return alert('No images added');
+<script>
+  let images = [];
 
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+  const fileInput = document.getElementById('fileInput');
+  const addBtn = document.getElementById('addBtn');
+  const imageList = document.getElementById('imageList');
 
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        const imgData = await getBase64(img.file);
+  addBtn.onclick = () => {
+    const files = [...fileInput.files];
+    if (!files.length) return;
 
-        // create image to read size
-        const tempImg = new Image();
-        tempImg.src = imgData;
-        await tempImg.decode();
+    files.forEach(file => {
+      const url = URL.createObjectURL(file);
+      images.push({ file, url });
+    });
 
-        const ratio = Math.min(pageWidth / tempImg.width, pageHeight / tempImg.height);
-        const newW = tempImg.width * ratio;
-        const newH = tempImg.height * ratio;
+    fileInput.value = "";
+    renderList();
+  };
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', (pageWidth - newW)/2, (pageHeight - newH)/2, newW, newH);
-      }
+  function renderList() {
+    imageList.innerHTML = '';
 
-      pdf.save('Images.pdf');
-    };
+    images.forEach((img, index) => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.draggable = true;
 
-    function getBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      div.innerHTML = `
+        <img src="${img.url}" />
+        <span>${img.file.name}</span>
+        <button data-remove="${index}">Remove</button>
+      `;
+
+      div.addEventListener('dragstart', e => {
+        div.classList.add('dragging');
+        e.dataTransfer.setData('index', index);
       });
+
+      div.addEventListener('dragend', () => {
+        div.classList.remove('dragging');
+      });
+
+      div.addEventListener('dragover', e => e.preventDefault());
+
+      div.addEventListener('drop', e => {
+        const from = Number(e.dataTransfer.getData('index'));
+        const to = index;
+        moveItem(from, to);
+      });
+
+      div.querySelector('button').onclick = () => {
+        const idx = Number(div.querySelector('button').dataset.remove);
+        images.splice(idx, 1);
+        renderList();
+      };
+
+      imageList.appendChild(div);
+    });
+  }
+
+  function moveItem(from, to) {
+    const temp = images[from];
+    images.splice(from, 1);
+    images.splice(to, 0, temp);
+    renderList();
+  }
+
+  document.getElementById('pdfBtn').onclick = async () => {
+    if (!images.length) return alert('No images added');
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      const imgData = await getBase64(img.file);
+
+      const tempImg = new Image();
+      tempImg.src = imgData;
+      await tempImg.decode();
+
+      const ratio = Math.min(pageWidth / tempImg.width, pageHeight / tempImg.height);
+      const newW = tempImg.width * ratio;
+      const newH = tempImg.height * ratio;
+
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', (pageWidth - newW)/2, (pageHeight - newH)/2, newW, newH);
     }
-  </script>
+
+    pdf.save('Images.pdf');
+    showNotify();
+  };
+
+  function getBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showNotify() {
+    const n = document.getElementById('notify');
+    n.style.display = 'block';
+    n.style.opacity = '0';
+    n.style.transform = 'translateY(20px)';
+
+    setTimeout(() => {
+      n.style.transition = 'all 0.3s ease';
+      n.style.opacity = '1';
+      n.style.transform = 'translateY(0)';
+    }, 10);
+
+    if (navigator.vibrate) navigator.vibrate(120);
+
+    setTimeout(() => {
+      n.style.opacity = '0';
+      n.style.transform = 'translateY(20px)';
+      setTimeout(() => (n.style.display = 'none'), 300);
+    }, 2500);
+  }
+</script>
+
 </body>
 </html>
