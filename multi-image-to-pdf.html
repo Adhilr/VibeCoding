@@ -27,25 +27,16 @@
     }
   </style>
 </head>
-
-<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <body>
   <h2>Images → PDF</h2>
-
   <input type="file" id="fileInput" accept="image/*" multiple />
   <button id="addBtn">Add Images</button>
-
   <div class="image-list" id="imageList"></div>
-
   <button id="pdfBtn" style="margin-top:20px; padding:10px 20px; font-size:16px;">Create PDF</button>
-
   <div id="notify">PDF Downloaded!</div>
-
 <script>
   let images = [];
-
   const fileInput = document.getElementById('fileInput');
   const addBtn = document.getElementById('addBtn');
   const imageList = document.getElementById('imageList');
@@ -53,53 +44,23 @@
   addBtn.onclick = () => {
     const files = [...fileInput.files];
     if (!files.length) return;
-
-    files.forEach(file => {
-      const url = URL.createObjectURL(file);
-      images.push({ file, url });
-    });
-
+    files.forEach(file => { images.push({ file, url: URL.createObjectURL(file) }); });
     fileInput.value = "";
     renderList();
   };
 
   function renderList() {
     imageList.innerHTML = '';
-
     images.forEach((img, index) => {
       const div = document.createElement('div');
       div.className = 'item';
       div.draggable = true;
-
-      div.innerHTML = `
-        <img src="${img.url}" />
-        <span>${img.file.name}</span>
-        <button data-remove="${index}">Remove</button>
-      `;
-
-      div.addEventListener('dragstart', e => {
-        div.classList.add('dragging');
-        e.dataTransfer.setData('index', index);
-      });
-
-      div.addEventListener('dragend', () => {
-        div.classList.remove('dragging');
-      });
-
+      div.innerHTML = `<img src="${img.url}" /><span>${img.file.name}</span><button data-remove="${index}">Remove</button>`;
+      div.addEventListener('dragstart', e => { div.classList.add('dragging'); e.dataTransfer.setData('index', index); });
+      div.addEventListener('dragend', () => { div.classList.remove('dragging'); });
       div.addEventListener('dragover', e => e.preventDefault());
-
-      div.addEventListener('drop', e => {
-        const from = Number(e.dataTransfer.getData('index'));
-        const to = index;
-        moveItem(from, to);
-      });
-
-      div.querySelector('button').onclick = () => {
-        const idx = Number(div.querySelector('button').dataset.remove);
-        images.splice(idx, 1);
-        renderList();
-      };
-
+      div.addEventListener('drop', e => { moveItem(Number(e.dataTransfer.getData('index')), index); });
+      div.querySelector('button').onclick = () => { images.splice(index, 1); renderList(); };
       imageList.appendChild(div);
     });
   }
@@ -114,6 +75,9 @@
   document.getElementById('pdfBtn').onclick = async () => {
     if (!images.length) return alert('No images added');
 
+    let pdfName = prompt('Enter PDF name (leave empty to use first image name)');
+    if (!pdfName || !pdfName.trim()) pdfName = images[0].file.name.replace(/\.[^/.]+$/, '');
+
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -122,30 +86,22 @@
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
       const imgData = await getBase64(img.file);
-
       const tempImg = new Image();
       tempImg.src = imgData;
       await tempImg.decode();
-
       const ratio = Math.min(pageWidth / tempImg.width, pageHeight / tempImg.height);
       const newW = tempImg.width * ratio;
       const newH = tempImg.height * ratio;
-
       if (i > 0) pdf.addPage();
       pdf.addImage(imgData, 'JPEG', (pageWidth - newW)/2, (pageHeight - newH)/2, newW, newH);
     }
 
-    pdf.save('Images.pdf');
+    pdf.save(pdfName + '.pdf');
     showNotify();
   };
 
   function getBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
   }
 
   function showNotify() {
@@ -153,22 +109,10 @@
     n.style.display = 'block';
     n.style.opacity = '0';
     n.style.transform = 'translateY(20px)';
-
-    setTimeout(() => {
-      n.style.transition = 'all 0.3s ease';
-      n.style.opacity = '1';
-      n.style.transform = 'translateY(0)';
-    }, 10);
-
+    setTimeout(() => { n.style.transition = 'all 0.3s ease'; n.style.opacity = '1'; n.style.transform = 'translateY(0)'; }, 10);
     if (navigator.vibrate) navigator.vibrate(120);
-
-    setTimeout(() => {
-      n.style.opacity = '0';
-      n.style.transform = 'translateY(20px)';
-      setTimeout(() => (n.style.display = 'none'), 300);
-    }, 2500);
+    setTimeout(() => { n.style.opacity = '0'; n.style.transform = 'translateY(20px)'; setTimeout(() => n.style.display='none', 300); }, 2500);
   }
 </script>
-
 </body>
 </html>
