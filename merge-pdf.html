@@ -75,7 +75,8 @@
   document.getElementById('mergeBtn').onclick = async () => {
     if (!pdfFiles.length) return alert('No PDFs added');
 
-    let pdfName = prompt('Enter merged PDF name (leave empty to use first PDF name)');
+    // Prompt for PDF name first
+    let pdfName = window.prompt('Enter merged PDF name (leave empty to use first PDF name)');
     if (!pdfName || !pdfName.trim()) pdfName = pdfFiles[0].file.name.replace(/\.[^/.]+$/, '');
 
     const mergedPdf = await PDFLib.PDFDocument.create();
