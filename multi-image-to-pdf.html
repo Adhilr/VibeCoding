@@ -1,44 +1,145 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { GripVertical, X } from "lucide-react";
-import { motion, Reorder } from "framer-motion";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Images to PDF</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .image-list { margin-top: 20px; }
+    .item { display: flex; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    img { width: 60px; height: 60px; object-fit: cover; border-radius: 5px; margin-right: 10px; }
+    button { margin-left: auto; }
+    .item.dragging { opacity: 0.4; }
+  </style>
+</head>
+<!-- ADD THIS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-export default function MultiImageUploader() {
-  const [images, setImages] = useState([]);
+<script>
+  const { jsPDF } = window.jspdf;  // REQUIRED
 
-  const handleAddImage = (e) => {
-    const files = Array.from(e.target.files);
-    const newItems = files.map((file) => ({
-      id: URL.createObjectURL(file),
-      file,
-    }));
-    setImages((prev) => [...prev, ...newItems]);
-  };
+</script>
+<body>
+    
+  <h2>Images → PDF</h2>
 
-  const handleRemove = (id) => {
-    setImages((prev) => prev.filter((img) => img.id !== id));
-  };
+  <input type="file" id="fileInput" accept="image/*" multiple />
+  <button id="addBtn">Add Images</button>
 
-  return (
-    <div className="p-4 max-w-xl mx-auto space-y-4">
-      <h2 className="text-2xl font-semibold">Multi Image Uploader</h2>
+  <div class="image-list" id="imageList"></div>
 
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleAddImage}
-        className="block"
-      />
+  <script>
+    let images = [];
 
-      <Reorder.Group axis="y" values={images} onReorder={setImages} className="space-y-3">
-        {images.map((img) => (
-          <Reorder.Item key={img.id} value={img}>
-            <Card className="p-2 flex items-center gap-3 rounded-2xl shadow-sm">
-              <GripVertical className="w-5 h-5 text-gray-400" />
-              <img
-                src={img.id}
-                alt="uploaded"
-                className="w-20 h-20 object-cover rounded-xl"
-              /
+    const fileInput = document.getElementById('fileInput');
+    const addBtn = document.getElementById('addBtn');
+    const imageList = document.getElementById('imageList');
+
+    addBtn.onclick = () => {
+      const files = [...fileInput.files];
+      if (!files.length) return;
+
+      files.forEach(file => {
+        const url = URL.createObjectURL(file);
+        images.push({ file, url });
+      });
+
+      fileInput.value = ""; // reset input
+      renderList();
+    };
+
+    function renderList() {
+      imageList.innerHTML = '';
+
+      images.forEach((img, index) => {
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.draggable = true;
+
+        div.innerHTML = `
+          <img src="${img.url}" />
+          <span>${img.file.name}</span>
+          <button data-remove="${index}">Remove</button>
+        `;
+
+        div.addEventListener('dragstart', e => {
+          div.classList.add('dragging');
+          e.dataTransfer.setData('index', index);
+        });
+
+        div.addEventListener('dragend', () => {
+          div.classList.remove('dragging');
+        });
+
+        div.addEventListener('dragover', e => {
+          e.preventDefault();
+        });
+
+        div.addEventListener('drop', e => {
+          const from = Number(e.dataTransfer.getData('index'));
+          const to = index;
+          moveItem(from, to);
+        });
+
+        div.querySelector('button').onclick = () => {
+          const idx = Number(div.querySelector('button').dataset.remove);
+          images.splice(idx, 1);
+          renderList();
+        };
+
+        imageList.appendChild(div);
+      });
+    }
+
+    function moveItem(from, to) {
+      const temp = images[from];
+      images.splice(from, 1);
+      images.splice(to, 0, temp);
+      renderList();
+    }
+  </script>
+  <button id="pdfBtn" style="margin-top:20px; padding:10px 20px; font-size:16px;">Create PDF</button>
+
+  <script>
+    // existing JS stays above
+
+    document.getElementById('pdfBtn').onclick = async () => {
+      if (!images.length) return alert('No images added');
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const imgData = await getBase64(img.file);
+
+        // create image to read size
+        const tempImg = new Image();
+        tempImg.src = imgData;
+        await tempImg.decode();
+
+        const ratio = Math.min(pageWidth / tempImg.width, pageHeight / tempImg.height);
+        const newW = tempImg.width * ratio;
+        const newH = tempImg.height * ratio;
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', (pageWidth - newW)/2, (pageHeight - newH)/2, newW, newH);
+      }
+
+      pdf.save('Images.pdf');
+    };
+
+    function getBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
