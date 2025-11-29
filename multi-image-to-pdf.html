@@ -1,91 +1,44 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <title>Images to PDF</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { GripVertical, X } from "lucide-react";
+import { motion, Reorder } from "framer-motion";
 
-  <style>
-    body { font-family: Arial; padding: 20px; text-align: center; }
-    button { padding: 12px 18px; margin: 10px; background: #007bff; color: white; border: none;
-             border-radius: 8px; font-size: 16px; }
-    #createBtn { background: green; }
-    #fileList { margin-top: 20px; font-size: 14px; text-align: left; display: inline-block; }
-  </style>
-</head>
-<body>
+export default function MultiImageUploader() {
+  const [images, setImages] = useState([]);
 
-  <h2>Images to PDF (Add Multiple Batches)</h2>
+  const handleAddImage = (e) => {
+    const files = Array.from(e.target.files);
+    const newItems = files.map((file) => ({
+      id: URL.createObjectURL(file),
+      file,
+    }));
+    setImages((prev) => [...prev, ...newItems]);
+  };
 
-  <input type="file" id="filePicker" accept="image/*" style="display:none" multiple />
+  const handleRemove = (id) => {
+    setImages((prev) => prev.filter((img) => img.id !== id));
+  };
 
-  <button onclick="pickFiles()">Add Images</button>
-  <button id="createBtn">Create PDF</button>
+  return (
+    <div className="p-4 max-w-xl mx-auto space-y-4">
+      <h2 className="text-2xl font-semibold">Multi Image Uploader</h2>
 
-  <div id="fileList"></div>
-  <p id="status"></p>
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleAddImage}
+        className="block"
+      />
 
-<script>
-let allFiles = [];   // store files globally
-
-function pickFiles() {
-  document.getElementById("filePicker").click();
-}
-
-// When user selects files
-document.getElementById("filePicker").onchange = function (event) {
-  const files = Array.from(event.target.files);
-
-  // Add new files to global array
-  allFiles = allFiles.concat(files);
-
-  updateFileList();
-};
-
-// Show added file names
-function updateFileList() {
-  const listDiv = document.getElementById("fileList");
-  if (allFiles.length === 0) {
-    listDiv.innerHTML = "<p>No images added yet.</p>";
-    return;
-  }
-
-  let html = "<b>Images Added:</b><br><ul>";
-  allFiles.forEach(f => {
-    html += "<li>" + f.name + "</li>";
-  });
-  html += "</ul>";
-
-  listDiv.innerHTML = html;
-}
-
-
-document.getElementById("createBtn").onclick = async function () {
-  const status = document.getElementById("status");
-
-  if (allFiles.length === 0) {
-    status.textContent = "Add at least one image!";
-    return;
-  }
-
-  let pdfName = prompt("Enter PDF name:");
-  if (!pdfName || !pdfName.trim()) pdfName = "Images";
-
-  status.textContent = "Processing... Please wait.";
-
-  // Sort by filename
-  const sortedFiles = allFiles.sort((a, b) => a.name.localeCompare(b.name));
-
-  const { jsPDF } = window.jspdf;
-
-  const firstImg = await loadImage(sortedFiles[0]);
-  const pdf = new jsPDF({
-    orientation: firstImg.width > firstImg.height ? "landscape" : "portrait",
-    unit: "px",
-    format: [firstImg.width, firstImg.height]
-  });
-
-  pdf.addImage(firstImg, "JPEG", 0, 0, firstImg.width, firstImg.height);
-
-  for (let i = 1; i < sortedFiles.length; i++) {
-    const img = await
+      <Reorder.Group axis="y" values={images} onReorder={setImages} className="space-y-3">
+        {images.map((img) => (
+          <Reorder.Item key={img.id} value={img}>
+            <Card className="p-2 flex items-center gap-3 rounded-2xl shadow-sm">
+              <GripVertical className="w-5 h-5 text-gray-400" />
+              <img
+                src={img.id}
+                alt="uploaded"
+                className="w-20 h-20 object-cover rounded-xl"
+              /
