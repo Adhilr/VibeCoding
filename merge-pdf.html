@@ -4,16 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Merge PDFs</title>
-
-  <!-- PDF-LIB for merging PDFs -->
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
-
   <style>
     body { font-family: sans-serif; padding: 20px; }
     .pdf-list { margin-top: 20px; }
     .item { display: flex; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
     button { margin-left: auto; }
     .item.dragging { opacity: 0.4; }
+    #notify {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4caf50;
+      color: white;
+      padding: 14px 20px;
+      border-radius: 8px;
+      display: none;
+      opacity: 0;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
@@ -21,14 +31,12 @@
 
   <input type="file" id="pdfInput" accept="application/pdf" multiple />
   <button id="addBtn">Add PDF Files</button>
-
   <div class="pdf-list" id="pdfList"></div>
-
   <button id="mergeBtn" style="margin-top:20px; padding:12px 20px; font-size:16px;">Merge PDFs</button>
+  <div id="notify">PDF Downloaded!</div>
 
 <script>
   let pdfFiles = [];
-
   const pdfInput = document.getElementById('pdfInput');
   const pdfList = document.getElementById('pdfList');
   const addBtn = document.getElementById('addBtn');
@@ -36,53 +44,23 @@
   addBtn.onclick = () => {
     const files = [...pdfInput.files];
     if (!files.length) return;
-
-    files.forEach(file => {
-      pdfFiles.push({ file });
-    });
-
-    pdfInput.value = "";
+    files.forEach(file => { pdfFiles.push({ file }); });
+    pdfInput.value = '';
     renderList();
   };
 
   function renderList() {
     pdfList.innerHTML = '';
-
     pdfFiles.forEach((item, index) => {
       const div = document.createElement('div');
       div.className = 'item';
       div.draggable = true;
-
-      div.innerHTML = `
-        <span>${item.file.name}</span>
-        <button data-remove="${index}">Remove</button>
-      `;
-
-      div.addEventListener('dragstart', e => {
-        div.classList.add('dragging');
-        e.dataTransfer.setData('index', index);
-      });
-
-      div.addEventListener('dragend', () => {
-        div.classList.remove('dragging');
-      });
-
-      div.addEventListener('dragover', e => {
-        e.preventDefault();
-      });
-
-      div.addEventListener('drop', e => {
-        const from = Number(e.dataTransfer.getData('index'));
-        const to = index;
-        moveItem(from, to);
-      });
-
-      div.querySelector('button').onclick = () => {
-        const idx = Number(div.querySelector('button').dataset.remove);
-        pdfFiles.splice(idx, 1);
-        renderList();
-      };
-
+      div.innerHTML = `<span>${item.file.name}</span><button data-remove="${index}">Remove</button>`;
+      div.addEventListener('dragstart', e => { div.classList.add('dragging'); e.dataTransfer.setData('index', index); });
+      div.addEventListener('dragend', () => { div.classList.remove('dragging'); });
+      div.addEventListener('dragover', e => e.preventDefault());
+      div.addEventListener('drop', e => { moveItem(Number(e.dataTransfer.getData('index')), index); });
+      div.querySelector('button').onclick = () => { pdfFiles.splice(index, 1); renderList(); };
       pdfList.appendChild(div);
     });
   }
@@ -97,6 +75,9 @@
   document.getElementById('mergeBtn').onclick = async () => {
     if (!pdfFiles.length) return alert('No PDFs added');
 
+    let pdfName = prompt('Enter merged PDF name (leave empty to use first PDF name)');
+    if (!pdfName || !pdfName.trim()) pdfName = pdfFiles[0].file.name.replace(/\.[^/.]+$/, '');
+
     const mergedPdf = await PDFLib.PDFDocument.create();
 
     for (let i = 0; i < pdfFiles.length; i++) {
@@ -107,41 +88,28 @@
     }
 
     const bytes = await mergedPdf.save();
-
     const blob = new Blob([bytes], { type: 'application/pdf' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'Merged.pdf';
+    const pdfUrl = URL.createObjectURL(blob);
+    link.href = pdfUrl;
+    link.download = pdfName + '.pdf';
     link.click();
-  }
-</script>
 
-  <div id="notify" style="display:none; margin-top:15px; padding:12px; background:#4caf50; color:white; border-radius:6px;">PDF downloaded successfully!</div>
+    // Attempt auto-open
+    try { window.open(pdfUrl, '_blank'); } catch(e) { console.log('Auto-open blocked'); }
 
-<script>
-// Notification function (with vibration + slide animation)
-function showNotify() {
-  const n = document.getElementById('notify');
-  n.style.display = 'block';
-  n.style.opacity = '0';
-  n.style.transform = 'translateY(20px)';
+    showNotify();
+  };
 
-  setTimeout(() => {
-    n.style.transition = 'all 0.3s ease';
-    n.style.opacity = '1';
-    n.style.transform = 'translateY(0)';
-  }, 10);
-
-  // Vibration
-  if (navigator.vibrate) navigator.vibrate(120);
-
-  setTimeout(() => {
+  function showNotify() {
+    const n = document.getElementById('notify');
+    n.style.display = 'block';
     n.style.opacity = '0';
     n.style.transform = 'translateY(20px)';
-    setTimeout(() => (n.style.display = 'none'), 300);
-  }, 2500);
-}
+    setTimeout(() => { n.style.transition = 'all 0.3s ease'; n.style.opacity = '1'; n.style.transform = 'translateY(0)'; }, 10);
+    if (navigator.vibrate) navigator.vibrate(120);
+    setTimeout(() => { n.style.opacity = '0'; n.style.transform = 'translateY(20px)'; setTimeout(() => n.style.display='none', 300); }, 2500);
+  }
 </script>
-
 </body>
 </html>
