@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Merge PDFs</title>
+
+  <!-- PDF-LIB for merging PDFs -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .pdf-list { margin-top: 20px; }
+    .item { display: flex; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    button { margin-left: auto; }
+    .item.dragging { opacity: 0.4; }
+  </style>
+</head>
+<body>
+  <h2>Merge PDF Files</h2>
+
+  <input type="file" id="pdfInput" accept="application/pdf" multiple />
+  <button id="addBtn">Add PDF Files</button>
+
+  <div class="pdf-list" id="pdfList"></div>
+
+  <button id="mergeBtn" style="margin-top:20px; padding:12px 20px; font-size:16px;">Merge PDFs</button>
+
+<script>
+  let pdfFiles = [];
+
+  const pdfInput = document.getElementById('pdfInput');
+  const pdfList = document.getElementById('pdfList');
+  const addBtn = document.getElementById('addBtn');
+
+  addBtn.onclick = () => {
+    const files = [...pdfInput.files];
+    if (!files.length) return;
+
+    files.forEach(file => {
+      pdfFiles.push({ file });
+    });
+
+    pdfInput.value = "";
+    renderList();
+  };
+
+  function renderList() {
+    pdfList.innerHTML = '';
+
+    pdfFiles.forEach((item, index) => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.draggable = true;
+
+      div.innerHTML = `
+        <span>${item.file.name}</span>
+        <button data-remove="${index}">Remove</button>
+      `;
+
+      div.addEventListener('dragstart', e => {
+        div.classList.add('dragging');
+        e.dataTransfer.setData('index', index);
+      });
+
+      div.addEventListener('dragend', () => {
+        div.classList.remove('dragging');
+      });
+
+      div.addEventListener('dragover', e => {
+        e.preventDefault();
+      });
+
+      div.addEventListener('drop', e => {
+        const from = Number(e.dataTransfer.getData('index'));
+        const to = index;
+        moveItem(from, to);
+      });
+
+      div.querySelector('button').onclick = () => {
+        const idx = Number(div.querySelector('button').dataset.remove);
+        pdfFiles.splice(idx, 1);
+        renderList();
+      };
+
+      pdfList.appendChild(div);
+    });
+  }
+
+  function moveItem(from, to) {
+    const temp = pdfFiles[from];
+    pdfFiles.splice(from, 1);
+    pdfFiles.splice(to, 0, temp);
+    renderList();
+  }
+
+  document.getElementById('mergeBtn').onclick = async () => {
+    if (!pdfFiles.length) return alert('No PDFs added');
+
+    const mergedPdf = await PDFLib.PDFDocument.create();
+
+    for (let i = 0; i < pdfFiles.length; i++) {
+      const arrayBuff = await pdfFiles[i].file.arrayBuffer();
+      const pdf = await PDFLib.PDFDocument.load(arrayBuff);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach(page => mergedPdf.addPage(page));
+    }
+
+    const bytes = await mergedPdf.save();
+
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Merged.pdf';
+    link.click();
+  }
+</script>
+
+</body>
+</html>
