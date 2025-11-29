@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Images to PDF</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; text-align: center; }
+    #fileInput { margin: 20px 0; }
+    #btn { padding: 12px 20px; background: green; color: white; border: none; border-radius: 10px; font-size: 18px; }
+  </style>
+</head>
+<body>
+
+  <h2>Multiple Images to One PDF</h2>
+
+  <input type="file" id="fileInput" accept="image/*" multiple />
+  <br><br>
+
+  <button id="btn">Create PDF</button>
+  <p id="status"></p>
+
+<script>
+document.getElementById("btn").onclick = async function () {
+  const input = document.getElementById("fileInput");
+  const status = document.getElementById("status");
+
+  if (!input.files.length) {
+    status.textContent = "Select one or more images first.";
+    return;
+  }
+
+  let pdfName = prompt("Enter PDF name (without .pdf):");
+  if (!pdfName || !pdfName.trim()) pdfName = "Images";
+
+  status.textContent = "Processing... Please wait";
+
+  const files = Array.from(input.files).sort((a, b) => a.name.localeCompare(b.name));
+  const { jsPDF } = window.jspdf;
+
+  // Create an empty PDF first
+  const firstImg = await loadImage(files[0]);
+  const pdf = new jsPDF({
+    orientation: firstImg.width > firstImg.height ? "landscape" : "portrait",
+    unit: "px",
+    format: [firstImg.width, firstImg.height]
+  });
+
+  pdf.addImage(firstImg, "JPEG", 0, 0, firstImg.width, firstImg.height);
+
+  // Remaining images
+  for (let i = 1; i < files.length; i++) {
+    const img = await loadImage(files[i]);
+
+    pdf.addPage([img.width, img.height], img.width > img.height ? "landscape" : "portrait");
+    pdf.addImage(img, "JPEG", 0, 0, img.width, img.height);
+  }
+
+  pdf.save(pdfName + ".pdf");
+  status.textContent = "PDF created!";
+};
+
+// Helper — load image async
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+  });
+}
+</script>
+
+</body>
+</html>
