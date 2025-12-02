@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image Size Reducer (Mobile)</title>
+
+  <style>
+    :root{--accent:#0b66ff}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;margin:0;padding:16px;background:#f7f8fb;color:#061328}
+    .card{max-width:900px;margin:0 auto;background:#fff;padding:14px;border-radius:12px;box-shadow:0 6px 18px rgba(7,11,20,.06)}
+    h1{font-size:18px;margin:0 0 12px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    label.button{background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;cursor:pointer}
+    input[type=file]{display:none}
+    .small{font-size:13px;color:#56616b}
+    .range{display:flex;gap:8px;align-items:center}
+    .preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:12px}
+    .thumb{border-radius:8px;overflow:hidden;border:1px solid #e6edf6;padding:6px;background:#fafcff}
+    .thumb img{width:100%;height:80px;object-fit:cover;border-radius:6px;display:block}
+    .meta{font-size:12px;color:#374151;margin-top:6px}
+    button.primary{background:#059669;color:#fff;border:0;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.ghost{background:#f1f5f9;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+    .status{margin-top:10px;font-size:13px;color:#0b66ff}
+    .row{display:flex;gap:8px;align-items:center}
+    .right{margin-left:auto}
+    .toggle{display:flex;gap:8px;align-items:center}
+  </style>
+  <!-- JSZip for ZIP downloads -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
+</head>
+<body>
+  <div class="card">
+    <h1>Image Size Reducer</h1>
+
+    <div class="controls">
+      <label class="button" for="files">Choose images</label>
+      <input id="files" type="file" accept="image/*" multiple>
+
+      <button id="addMore" class="ghost">Add more</button>
+
+      <div class="right row">
+        <div class="range">
+          <span class="small">Max px</span>
+          <input id="maxPx" type="range" min="200" max="3000" value="1024" step="50">
+          <span id="maxPxVal" class="small" style="min-width:56px;text-align:right">1024px</span>
+        </div>
+        <div class="range" style="margin-left:8px">
+          <span class="small">Quality</span>
+          <input id="quality" type="range" min="10" max="95" value="80">
+          <span id="qualityVal" class="small" style="min-width:36px;text-align:right">0.80</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <label><input type="checkbox" id="zipToggle" checked> Download as ZIP</label>
+      <button id="compressBtn" class="primary" style="margin-left:auto">Compress & Download</button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div id="preview" class="preview" aria-live="polite"></div>
+  </div>
+
+<script>
+(function(){
+  const filesInput = document.getElementById('files');
+  const addMoreBtn = document.getElementById('addMore');
+  const preview = document.getElementById('preview');
+  const maxPx = document.getElementById('maxPx');
+  const maxPxVal = document.getElementById('maxPxVal');
+  const quality = document.getElementById('quality');
+  const qualityVal = document.getElementById('qualityVal');
+  const compressBtn = document.getElementById('compressBtn');
+  const status = document.getElementById('status');
+  const zipToggle = document.getElementById('zipToggle');
+
+  let images = []; // { file, url, compressedBlob?, compressedName?, origSize }
+
+  maxPxVal.textContent = maxPx.value + 'px';
+  qualityVal.textContent = (quality.value/100).toFixed(2);
+
+  maxPx.oninput = () => { maxPxVal.textContent = maxPx.value + 'px'; };
+  quality.oninput = () => { qualityVal.textContent = (quality.value/100).toFixed(2); };
+
+  // Add selected files as a batch (keeps previous ones)
+  function addFilesFromInput(inputFiles) {
+    const list = Array.from(inputFiles || []);
+    if (!list.length) return;
+    for (const f of list) {
+      if (!f.type.startsWith('image/')) continue;
+      const url = URL.createObjectURL(f);
+      images.push({ file: f, url, origSize: f.size, compressedBlob: null, compressedName: null });
+    }
+    renderPreview();
+  }
+
+  filesInput.addEventListener('change', (e) => addFilesFromInput(e.target.files));
+  addMoreBtn.addEventListener('click', () => filesInput.click());
+
+  // Render thumbnails and info
+  function renderPreview() {
+    preview.innerHTML = '';
+    if (!images.length) {
+      preview.innerHTML = '<div class="small">No images selected.</div>';
+      return;
+    }
+    images.forEach((it, idx) => {
+      const el = document.createElement('div');
+      el.className = 'thumb';
+      el.innerHTML = `
+        <img src="${it.url}" alt="${escapeHtml(it.file.name)}" />
+        <div class="meta"><strong>${escapeHtml(it.file.name)}</strong><br>
+          orig: ${formatBytes(it.origSize)}<br>
+          ${it.compressedBlob ? 'new: ' + formatBytes(it.compressedBlob.size) : '<span style="color:#9aa6b2">not compressed</span>'}
+          <div style="margin-top:6px">
+            <button data-idx="${idx}" class="btn-download" style="font-size:12px;padding:6px 8px;margin-right:5px">Download</button>
+            <button data-idx="${idx}" class="btn-remove" style="font-size:12px;padding:6px 8px">Remove</button>
+          </div>
+        </div>
+      `;
+      preview.appendChild(el);
+    });
+
+    // attach listeners
+    document.querySelectorAll('.btn-remove').forEach(btn => {
+      btn.onclick = e => {
+        const idx = Number(e.currentTarget.dataset.idx);
+        URL.revokeObjectURL(images[idx].url);
+        images.splice(idx,1);
+        renderPreview();
+      };
+    });
+
+    document.querySelectorAll('.btn-download').forEach(btn => {
+      btn.onclick = async (e) => {
+        const idx = Number(e.currentTarget.dataset.idx);
+        if (!images[idx].compressedBlob) {
+          status.textContent = 'Compressing file first...';
+          await compressSingle(idx);
+          status.textContent = '';
+        }
+        downloadBlob(images[idx].compressedBlob, images[idx].compressedName);
+      };
+    });
+  }
+
+  // Helpers
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    const units = ['KB','MB','GB'];
+    let u = -1;
+    do { bytes /= 1024; u++; } while(bytes >= 1024 && u < units.length-1);
+    return bytes.toFixed(2) + ' ' + units[u];
+  }
+  function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Resize + compress one image by index
+  async function compressSingle(idx) {
+    const item = images[idx];
+    const imgDataUrl = await readFileAsDataURL(item.file);
+    const img = await loadImage(imgDataUrl);
+    // compute new size preserving aspect ratio
+    const max = Number(maxPx.value);
+    let w = img.naturalWidth, h = img.naturalHeight;
+    let scale = 1;
+    if (Math.max(w,h) > max) scale = max / Math.max(w,h);
+    const cw = Math.round(w * scale), ch = Math.round(h * scale);
+    // draw to canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0,0,cw,ch);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    const q = Math.max(0.1, Math.min(0.95, Number(quality.value)/100));
+    const dataUrl = canvas.toDataURL('image/jpeg', q);
+    // convert to blob
+    const blob = dataURLToBlob(dataUrl);
+    const originalName = item.file.name.replace(/\.[^/.]+$/, '');
+    const ext = 'jpg';
+    const newName = `${originalName}_sm.${ext}`;
+    item.compressedBlob = blob;
+    item.compressedName = newName;
+    return item;
+  }
+
+  // Compress all images (with progress)
+  async function compressAll(progressCb) {
+    status.textContent = 'Compressing...';
+    for (let i=0;i<images.length;i++) {
+      await compressSingle(i);
+      if (progressCb) progressCb(i+1, images.length);
+    }
+    status.textContent = 'Compression done';
+    renderPreview();
+  }
+
+  // Convert DataURL -> Blob
+  function dataURLToBlob(dataurl) {
+    const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) u8arr[n] = bstr.charCodeAt(n);
+    return new Blob([u8arr], {type:mime});
+  }
+
+  function readFileAsDataURL(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  }
+  function loadImage(dataUrl) {
+    return new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = dataUrl;
+    });
+  }
+
+  // Download single blob
+  function downloadBlob(blob, filename) {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(()=>{ URL.revokeObjectURL(link.href); link.remove(); }, 4000);
+  }
+
+  // ZIP and download
+  async function makeZipDownload() {
+    const zip = new JSZip();
+    for (let i=0;i<images.length;i++){
+      if (!images[i].compressedBlob) await compressSingle(i);
+      const arr = await images[i].compressedBlob.arrayBuffer();
+      zip.file(images[i].compressedName, arr);
+      status.textContent = `Adding ${i+1}/${images.length} to ZIP...`;
+    }
+    status.textContent = 'Generating ZIP...';
+    const content = await zip.generateAsync({type:"blob"}, metadata => {
+      // optional progress: metadata.percent
+    });
+    const defaultName = 'images_compressed.zip';
+    downloadBlob(content, defaultName);
+    status.textContent = 'ZIP downloaded';
+  }
+
+  // Button: compress & download (zip or single files)
+  compressBtn.addEventListener('click', async () => {
+    if (!images.length) { status.textContent = 'No images selected'; return; }
+    compressBtn.disabled = true;
+    try {
+      await compressAll((done, total) => {
+        status.textContent = `Compressed ${done}/${total}`;
+      });
+      if (zipToggle.checked) {
+        await makeZipDownload();
+      } else {
+        // download individually one by one (keeps user in control on mobile)
+        for (let i=0;i<images.length;i++){
+          downloadBlob(images[i].compressedBlob, images[i].compressedName);
+          // small pause to avoid download throttling
+          await new Promise(r => setTimeout(r, 300));
+        }
+        status.textContent = 'All files downloaded';
+      }
+    } catch (e) {
+      console.error(e);
+      status.textContent = 'Error: ' + (e.message || e);
+    } finally {
+      compressBtn.disabled = false;
+      renderPreview();
+    }
+  });
+
+  // initial preview state
+  renderPreview();
+
+})();
+</script>
+</body>
+</html>
