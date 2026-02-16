@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>VibeCoding — Tools</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <style>
+      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding: 32px; background:#f7fafc; color:#0f172a }
+      header { margin-bottom: 24px }
+      h1 { margin: 0 0 8px 0; font-size: 1.6rem }
+      p.lead { margin:0; color:#475569 }
+      .cards { display:grid; gap:12px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); margin-top:20px }
+      a.card { display:block; padding:14px; background:#fff; border-radius:8px; color:inherit; text-decoration:none; box-shadow:0 1px 2px rgba(2,6,23,0.06); border:1px solid rgba(2,6,23,0.04) }
+      a.card:hover { transform:translateY(-3px); box-shadow:0 6px 18px rgba(2,6,23,0.08) }
+      .small { font-size:0.9rem; color:#475569; margin-top:6px }
+      footer { margin-top:28px; font-size:0.85rem; color:#6b7280 }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>VibeCoding — HTML Tools</h1>
+      <p class="lead">Quick access to the utility pages in this workspace.</p>
+    </header>
+
+    <section class="cards">
+      <a class="card" href="image-pdf.html">
+        <strong>Single Image → PDF</strong>
+        <div class="small">Convert an image to a single-page PDF.</div>
+      </a>
+
+      <a class="card" href="multi-image-to-pdf.html">
+        <strong>Multiple Images → PDF</strong>
+        <div class="small">Combine multiple images into one PDF.</div>
+      </a>
+
+      <a class="card" href="merge-pdf.html">
+        <strong>Merge PDFs</strong>
+        <div class="small">Merge multiple PDF files into one.</div>
+      </a>
+
+      <a class="card" href="image-size-reducer.html">
+        <strong>Image Size Reducer</strong>
+        <div class="small">Reduce image dimensions or file size.</div>
+      </a>
+
+    </section>
+
+    <section id="readme-section" style="margin-top:22px">
+      <h2 style="margin:0 0 8px 0">Project README</h2>
+      <div id="readme-wrapper" style="background:#fff; padding:14px; border-radius:8px; border:1px solid rgba(2,6,23,0.04); box-shadow:0 1px 2px rgba(2,6,23,0.04);">
+        <pre id="readme" style="white-space:pre-wrap; margin:0; font-family:inherit; color:inherit">Loading README...</pre>
+      </div>
+    </section>
+    </section>
+
+    <footer>
+      Tip: Serve this folder (for example with <code>python -m http.server</code>) to test features that require a web server.
+    </footer>
+    <script>
+      fetch('README.md')
+        .then(r => {
+          if (!r.ok) throw new Error('Network response was not ok');
+          return r.text();
+        })
+        .then(text => { document.getElementById('readme').textContent = text; })
+        .catch(() => { document.getElementById('readme').textContent = 'Could not load README.'; });
+    </script>
+  </body>
+</html>
